@@ -416,7 +416,8 @@ class BaseEntity(CoordinatorEntity):
 
     def with_name(self, suffix: str, name: str):
         self._attr_has_entity_name = True
-        self._attr_unique_id = f"ns_panel_ng_{suffix}"
+        entry_id = self.coordinator._entry.entry_id
+        self._attr_unique_id = f"ns_panel_ng_{entry_id}_{suffix}"
         self._attr_name = name
         return self
 
