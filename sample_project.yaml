@@ -1,14 +1,16 @@
+# Required START
 substitutions:
   variant: "eu" # The only needed configuration
-  component_link: github://kvj/hass_NSPanel_NG@main # Most up-to-date
+  component_link: github://kvj/hass_NSPanel_NG@0.1.0 # Most up-to-date
+packages:
+  device_base: github://kvj/hass_NSPanel_NG/nspanel_ng.yaml@0.1.0 # Most up-to-date
+# Required END
 
 esphome:
-  device_name: "nspanel-ng-my-device"
+  name: "nspanel-ng-my-device"
   friendly_name: "NSPanel NG My Device"
 
 wifi: # Configure as you'd like
+  ssid: Change me
 
 logger: # Configure as you'd like
-
-packages:
-  device_base: github://kvj/hass_NSPanel_NG/nspanel_ng.yaml@main
