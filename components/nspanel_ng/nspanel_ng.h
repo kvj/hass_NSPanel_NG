@@ -30,6 +30,8 @@ static std::vector<std::string> entity_grid_cmps = {"grid_bg", "grid_e_icon", "g
 #define CT_DOUBLE_CLICK 2
 #define CT_LONG_CLICK 3
 
+#define TFT_UPDATE_DELAY 10000
+
 struct ClickTracker {
     uint32_t last_action;
     uint8_t  last_detected_click;
@@ -51,6 +53,8 @@ class NSPanelNG : public esphome::Component, public esphome::nextion::NextionCom
         std::string display_variant_;
         bool visual_feeback = true;
         bool sound_feedback = false;
+        std::string tft_url;
+        long tft_update_start = -1;
 
     public:
         void set_display(esphome::nextion::Nextion *display) { 

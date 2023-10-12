@@ -93,9 +93,18 @@ void NSPanelNG::send_metadata() {
 }
 
 void NSPanelNG::upload_tft(const std::string path) {
-    ESP_LOGD("ng", "upload_tft: via %s", path);
-    display->set_tft_url(path);
-    display->upload_tft();
+    ESP_LOGD("ng", "upload_tft: via %s", path.c_str());
+    if (tft_update_start == -1) {
+        display->set_tft_url(path);
+        display->write_str("DRAKJHSUYDGBNCJHGJKSHBDN");
+        const uint8_t to_send[3] = {0xFF, 0xFF, 0xFF};
+        display->write_array(to_send, sizeof(to_send));
+        tft_url = path;
+        tft_update_start = millis();
+        ESP_LOGI("ng", "upload_tft: Scheduled upload via %s", path.c_str());
+    } else {
+        ESP_LOGW("ng", "upload_tft: Already scheduled");
+    }
 }
 
 void NSPanelNG::update_grid_cell(const int index, const std::string type_, const int icon, const std::string name, const std::string value, const std::string unit, const int color) {
@@ -243,6 +252,14 @@ void NSPanelNG::loop() {
             map["index"] = std::to_string(i-8);
         }
         this->send_hass_event("Device_Event", map);
+    }
+    if (tft_update_start != -1) {
+        if (millis() - tft_update_start >= TFT_UPDATE_DELAY) {
+            tft_update_start = -1;
+            ESP_LOGI("ng", "Starting TFT Upload: %s", tft_url.c_str());
+            display->set_tft_url(tft_url);
+            display->upload_tft();
+        }
     }
 }
 

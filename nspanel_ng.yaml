@@ -78,19 +78,6 @@ uart:
 button:
   - platform: restart
     name: "Reboot"
-  # - name: Exit reparse
-  #   platform: template
-  #   icon: mdi:file-sync
-  #   id: tft_reparse_off
-  #   entity_category: config
-  #   on_press:
-  #     - logger.log: "Exit reparse"
-  #     - uart.write:
-  #         id: tf_uart
-  #         data: "DRAKJHSUYDGBNCJHGJKSHBDN"
-  #     - uart.write:
-  #         id: tf_uart
-  #         data: [0xFF, 0xFF, 0xFF]
 
 sensor:
   - platform: uptime
