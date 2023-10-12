@@ -1,0 +1,145 @@
+external_components:
+  - source: ${component_link}
+
+esp32:
+  board: esp32dev
+
+ota:
+api:
+  services:
+    - service: update_grid
+      variables:
+        index: int
+        type: string
+        icon: int
+        name: string
+        value: string
+        unit: string
+        color: int
+      then:
+        - lambda: |-
+            id(cmp).update_grid_cell(index, type, icon, name, value, unit, color);
+    - service: update_backlight
+      variables:
+        value: int
+      then:
+        - lambda: |-
+            id(cmp).update_backlight(value);
+    - service: update_relay
+      variables:
+        index: int
+        state: bool
+      then:
+        - lambda: |-
+            id(cmp).update_relay(index, state);
+    - service: update_text
+      variables:
+        index: int
+        content: string
+      then:
+        - lambda: |-
+            id(cmp).update_text(index, content);
+    - service: show_cancel_dialog
+      variables:
+        seconds: int
+      then:
+        - logger.log: "Service: show_cancel_dialog"
+    - service: send_metadata
+      then:
+        - lambda: |-
+            id(cmp).send_metadata();
+    - service: upload_tft
+      variables:
+        path: string
+      then:
+        - lambda: |-
+            id(cmp).upload_tft(path);
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+rtttl:
+  id: buzzer
+  output: buzzer_out
+
+output:
+  - platform: ledc
+    id: buzzer_out
+    pin:
+      number: 21
+
+uart:
+  id: tf_uart
+  tx_pin: 16
+  rx_pin: 17
+  baud_rate: 115200
+
+button:
+  - platform: restart
+    name: "Reboot"
+  # - name: Exit reparse
+  #   platform: template
+  #   icon: mdi:file-sync
+  #   id: tft_reparse_off
+  #   entity_category: config
+  #   on_press:
+  #     - logger.log: "Exit reparse"
+  #     - uart.write:
+  #         id: tf_uart
+  #         data: "DRAKJHSUYDGBNCJHGJKSHBDN"
+  #     - uart.write:
+  #         id: tf_uart
+  #         data: [0xFF, 0xFF, 0xFF]
+
+sensor:
+  - platform: uptime
+    name: "Uptime"
+    update_interval: 60s
+    icon: mdi:clock-outline
+
+switch:
+  - platform: gpio
+    id: relay_1
+    pin:
+      number: 22
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: relay_2
+    pin:
+      number: 19
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    id: screen_power
+    pin:
+      number: 4
+      inverted: true
+    restore_mode: ALWAYS_ON
+
+binary_sensor:
+  - platform: gpio
+    id: button_1
+    pin:
+      number: 14
+      inverted: true
+
+  - platform: gpio
+    id: button_2
+    pin:
+      number: 27
+      inverted: true
+
+
+display:
+  - id: disp
+    platform: nextion
+    uart_id: tf_uart
+    tft_url: "http://" # To enable TFT upload at runtime
+
+nspanel_ng:
+  id: cmp
+  button1: button_1
+  relay1: relay_1
+  button2: button_2
+  relay2: relay_2
+  variant: ${variant}

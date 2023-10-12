@@ -1,0 +1,5 @@
+{
+    "name": "NSPanel NG",
+    "domains": ["sensor", "button", "switch"],
+    "render_readme": true
+}

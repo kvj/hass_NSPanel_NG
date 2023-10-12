@@ -1,0 +1,13 @@
+{
+  "domain": "nspanel_ng",
+  "name": "NSPanel NG",
+  "documentation": "https://github.com/kvj/hass_NSPanel_NG",
+  "issue_tracker": "https://github.com/kvj/hass_NSPanel_NG/issues",
+  "dependencies": ["esphome"],
+  "codeowners": ["@kvj"],
+  "requirements": [],
+  "iot_class": "local_polling",
+  "config_flow": true,
+  "version": "0.1.0"
+}
+

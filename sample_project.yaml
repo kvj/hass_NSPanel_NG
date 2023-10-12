@@ -1,0 +1,14 @@
+substitutions:
+  variant: "eu" # The only needed configuration
+  component_link: github://kvj/hass_NSPanel_NG@main # Most up-to-date
+
+esphome:
+  device_name: "nspanel-ng-my-device"
+  friendly_name: "NSPanel NG My Device"
+
+wifi: # Configure as you'd like
+
+logger: # Configure as you'd like
+
+packages:
+  device_base: github://kvj/hass_NSPanel_NG/nspanel_ng.yaml@main

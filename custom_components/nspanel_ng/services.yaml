@@ -1,0 +1,27 @@
+update_panel:
+  name: Push new panel YAML to the device 
+  target:
+    device:
+      integration: nspanel_ng
+  fields:
+    template:
+      name: YAML configuration
+      description: Panel YAML configuration. This will replace any existing configuration. Not persistent.
+      required: true
+      example: "grid: []\ntexts: []"
+      selector:
+        object: {}
+upload_tft:
+  name: Upload arbitrary TFT file to the device 
+  target:
+    device:
+      integration: nspanel_ng
+  fields:
+    template:
+      name: YAML configuration
+      description: TFT file URL you'd like to push to the device 
+      required: true
+      example: "http://your-local-server/path/to/file.tft"
+      selector:
+        text:
+          type: url
