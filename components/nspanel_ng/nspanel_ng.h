@@ -30,7 +30,7 @@ static std::vector<std::string> entity_grid_cmps = {"grid_bg", "grid_e_icon", "g
 #define CT_DOUBLE_CLICK 2
 #define CT_LONG_CLICK 3
 
-#define TFT_UPDATE_DELAY 10000
+#define TFT_UPDATE_DELAY 15000
 
 struct ClickTracker {
     uint32_t last_action;

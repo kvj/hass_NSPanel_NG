@@ -260,7 +260,7 @@ class Coordinator(DataUpdateCoordinator):
                 return items[index]
         return None
 
-    async def _async_execute_action(self, entity_id: str, extra: dict | None):
+    async def _async_execute_action(self, entity_id: str, service: str, extra: dict | None):
         [domain, name] = entity_id.split(".")
         action = "homeassistant.toggle"
         if domain == "script":
@@ -271,6 +271,9 @@ class Coordinator(DataUpdateCoordinator):
             action = "scene.apply"
         elif domain == "button":
             action = "button.press"
+        if service:
+            action = service
+        
         _LOGGER.debug(f"_async_execute_action: action = {action}, entity = {entity_id}, extra={extra}")
         [domain, name] = action.split(".")
         await self.hass.services.async_call(domain, name, {
@@ -282,7 +285,7 @@ class Coordinator(DataUpdateCoordinator):
         conf = self._get_config_section("grid", index)
         if conf:
             if entity_id := conf.get("target", conf.get("entity_id")):
-                await self._async_execute_action(entity_id, conf.get("extra", {}))
+                await self._async_execute_action(entity_id, conf.get("service"), conf.get("extra", {}))
                 return
         await self._async_fire_event("grid_click", {
             "index": index,
@@ -298,7 +301,7 @@ class Coordinator(DataUpdateCoordinator):
                 await self.set_relay(index, None)
                 return
             if entity_id := conf.get("target"):
-                await self._async_execute_action(entity_id, conf.get("extra", {}))
+                await self._async_execute_action(entity_id, conf.get("service"), conf.get("extra", {}))
                 return
         await self._async_fire_event("button_click", {
             "index": index,
