@@ -23,7 +23,7 @@ static std::vector<std::string> entity_grid_cmps = {"grid_bg", "grid_e_icon", "g
 #define CT_PENDING 2
 
 #define CT_LONG_PRESS 800
-#define CT_DOUBLE_DELAY 200
+#define CT_DOUBLE_DELAY 100
 
 #define CT_NONE 0
 #define CT_CLICK 1
