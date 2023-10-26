@@ -8,7 +8,7 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/api/api_server.h"
 
-#define NS_PANEL_NG_VER "0.1.0"
+#define NS_PANEL_NG_VER "0.1.1"
 
 
 namespace esphome {
@@ -47,6 +47,7 @@ class NSPanelNG : public esphome::Component, public esphome::nextion::NextionCom
         esphome::binary_sensor::BinarySensor *button1, *button2;
         esphome::api::APIServer *api_server;
         float brightness_ = 1.0;
+        float off_brightness_ = 0.01;
         std::map<int, std::string> cell_types = {{0, ""}, {1, ""}, {2, ""}, {3, ""}, {4, ""}, {5, ""}, {6, ""}, {7, ""}};
         std::vector<ClickTracker> clicks;
         std::string display_version_ = "Disconnected";
@@ -57,6 +58,7 @@ class NSPanelNG : public esphome::Component, public esphome::nextion::NextionCom
         long tft_update_start = -1;
 
     public:
+
         void set_display(esphome::nextion::Nextion *display) { 
             this->display = display; 
             display->register_textsensor_component(this);
@@ -77,11 +79,11 @@ class NSPanelNG : public esphome::Component, public esphome::nextion::NextionCom
         void loop() override;
         void process_text(const std::string &name, const std::string &value) override;
         void update_relay(const int index, const bool state);
-        void update_backlight(const int value);
+        void update_backlight(const int value, const int off_value);
         void send_metadata();
         void upload_tft(const std::string path);
         void update_grid_cell(const int index, const std::string type_, const int icon, const std::string name, const std::string value, const std::string unit, const int color);
-        void update_text(const int index, const std::string content);
+        void update_text(const int index, const std::string content, const int icon, const int color);
 
     private:
         bool update_grid_visibility(const int index, const std::string type_, const bool force=false);
@@ -90,7 +92,7 @@ class NSPanelNG : public esphome::Component, public esphome::nextion::NextionCom
         void send_hass_event(const std::string name, std::map<std::string, std::string> extra);
         void track_click(int index, bool press);
         uint8_t compute_click(int index);
-        float _brightness_adjusted() { return brightness_ == 0? 0.01: brightness_; }
+        float _brightness_adjusted() { return brightness_ == 0? off_brightness_: brightness_; }
         void play_click_sound();
 };
 

@@ -7,7 +7,7 @@ update_panel:
     template:
       name: YAML configuration
       description: Panel YAML configuration. This will replace any existing configuration. Not persistent.
-      required: true
+      required: false
       example: "grid: []\ntexts: []"
       selector:
         object: {}
@@ -17,8 +17,8 @@ upload_tft:
     device:
       integration: nspanel_ng
   fields:
-    template:
-      name: YAML configuration
+    path:
+      name: TFT file URL
       description: TFT file URL you'd like to push to the device 
       required: true
       example: "http://your-local-server/path/to/file.tft"

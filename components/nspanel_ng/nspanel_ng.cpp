@@ -76,9 +76,10 @@ void NSPanelNG::update_relay(const int index, const bool state) {
     }
 }
 
-void NSPanelNG::update_backlight(const int value) {
-    ESP_LOGD("ng", "update_backlight: %d", value);
+void NSPanelNG::update_backlight(const int value, const int off_value) {
+    ESP_LOGD("ng", "update_backlight: %d / %d", value, off_value);
     brightness_ = value / 255.0;
+    off_brightness_  = off_value / 100.0;
     display->set_backlight_brightness(_brightness_adjusted());
 }
 
@@ -267,9 +268,18 @@ void NSPanelNG::play_click_sound() {
     rtttl_player->play("one_short:d=4,o=5,b=100:128c-1");
 }
 
-void NSPanelNG::update_text(const int index, const std::string content) {
+void NSPanelNG::update_text(const int index, const std::string content, const int icon, const int color) {
     ESP_LOGD("ng", "update_text[%d]: %s", index, content.c_str());
-    display->set_component_text(this->gen_id("bottom_text", index).c_str(), content.c_str());
+    if (icon > 0) {
+        display->hide_component(this->gen_id("bottom_text", index).c_str());
+        display->set_component_font_color(this->gen_id("bottom_icon", index).c_str(), color);
+        display->set_component_text_printf(this->gen_id("bottom_icon", index).c_str(), this->gen_icon_char(icon).c_str());
+        display->show_component(this->gen_id("bottom_icon", index).c_str());
+    } else {
+        display->hide_component(this->gen_id("bottom_icon", index).c_str());
+        display->set_component_text(this->gen_id("bottom_text", index).c_str(), content.c_str());
+        display->show_component(this->gen_id("bottom_text", index).c_str());
+    }
 }
 
 }

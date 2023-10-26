@@ -1,4 +1,4 @@
-from .constants import DOMAIN, DEFAULT_ICON, MDI_ICONS_MAP, OFF_COLOR, ON_COLOR, normalize_icon, icon_from_state
+from .constants import DOMAIN, DEFAULT_ICON, MDI_ICONS_MAP, OFF_COLOR, ON_COLOR, BRIGHT_COLOR, normalize_icon, icon_from_state
 from .config_flow import find_service
 
 from homeassistant.helpers.update_coordinator import (
@@ -35,6 +35,7 @@ class Coordinator(DataUpdateCoordinator):
         return {
             "available": False,
             "brightness": data.get("brightness", 255),
+            "off_brightness": data.get("off_brightness", 1),
             "relays": data.get("relays", [False, False]),
             "component_version": None,
             "device_version": None,
@@ -85,17 +86,29 @@ class Coordinator(DataUpdateCoordinator):
         if svc := self.services.get("update_grid"):
             await self.hass.services.async_call("esphome", svc, data, blocking=False)
 
-    async def _async_send_text_update(self, index: int, text: str):
+    async def _async_send_static_text_update(self, index: int, conf: dict):
+        icon = self._icon_2_glyph(conf["icon"]) if "icon" in conf else 0
+        color = self._color_hex_2_565(conf.get("color", BRIGHT_COLOR))
+        return await self._async_send_text_update(index, conf.get("text", ""), icon, color)
+
+    async def _async_send_text_update(self, index: int, text: str, icon: int=0, color: int=65535):
         data = {
             "index": index,
             "content": text,
+            "icon": icon,
+            "color": color,
         }
         if svc := self.services.get("update_text"):
             await self.hass.services.async_call("esphome", svc, data, blocking=False)
 
-    async def _async_send_brightness(self, value):
+    async def _async_send_brightness(self):
+        value = self.data["brightness"]
+        off_value = self.data["off_brightness"]
         if svc := self.services.get("update_backlight"):
-            await self.hass.services.async_call("esphome", svc, {"value": value if value > 0 else 0}, blocking=False)
+            await self.hass.services.async_call("esphome", svc, {
+                "value": value if value > 0 else 0,
+                "off_value": off_value,
+            }, blocking=False)
 
     async def _async_send_relay_state(self, index, state):
         if svc := self.services.get("update_relay"):
@@ -173,13 +186,13 @@ class Coordinator(DataUpdateCoordinator):
         _entity_ids = []
         idx = 0
         for g in self._config.get("grid", []):
-            if g.get("type") == "hidden":
-                await self._async_send_grid_update(idx, type_="hidden")
-            elif entity_id := g.get("entity_id"):
+            if entity_id := g.get("entity_id"):
                 _entity_ids.append(entity_id)
-            else:
+            elif g.get("type") == "button":
                 _LOGGER.debug(f"async_refresh_panel: Static item[{idx}]: {g}")
                 await self._async_send_static_item(idx, g)
+            else:
+                await self._async_send_grid_update(idx, type_="hidden")
             idx += 1
         for i in range(idx, 8):
             await self._async_send_grid_update(i, type_="hidden")
@@ -188,10 +201,10 @@ class Coordinator(DataUpdateCoordinator):
             if entity_id := t.get("entity_id"):
                 _entity_ids.append(entity_id)
             else:
-                await self._async_send_text_update(idx, t.get("text", ""))
+                await self._async_send_static_text_update(idx, t)
             idx += 1
         for i in range(idx, 2):
-            await self._async_send_text_update(i, "")
+            await self._async_send_static_text_update(i, {})
         
         if len(_entity_ids):
             self._panel_listeners.append(event.async_track_state_change(self.hass, _entity_ids, action=self._async_on_state_change))
@@ -235,7 +248,7 @@ class Coordinator(DataUpdateCoordinator):
         })
         if available and changed:
             self.services = self._discover_services()
-            await self._async_send_brightness(self.data["brightness"])
+            await self._async_send_brightness()
             await self._async_send_relay_state(0, self.data["relays"][0])
             await self._async_send_relay_state(1, self.data["relays"][1])
             await self._async_request_metadata()
@@ -362,6 +375,10 @@ class Coordinator(DataUpdateCoordinator):
     def brightness(self):
         return self.data["brightness"]
 
+    @property
+    def off_brightness(self):
+        return self.data["off_brightness"]
+
     def relay(self, index: int):
         return self.data["relays"][index]
 
@@ -385,7 +402,12 @@ class Coordinator(DataUpdateCoordinator):
                 value = -value
         await self._async_update_state({"brightness": value})
         await self._async_update_storage({"brightness": value})
-        await self._async_send_brightness(value)
+        await self._async_send_brightness()
+
+    async def set_off_brightness(self, value: int):
+        await self._async_update_state({"off_brightness": value})
+        await self._async_update_storage({"off_brightness": value})
+        await self._async_send_brightness()
 
     async def async_upload_tft(self, path: str = None):
         variant = self.data["variant"]
@@ -404,7 +426,7 @@ class Coordinator(DataUpdateCoordinator):
     
     async def async_service_update_panel(self, data: dict):
         _LOGGER.debug(f"async_service_update_panel: {data}")
-        await self.async_refresh_panel(data["template"])
+        await self.async_refresh_panel(data.get("template"))
 
     async def async_service_upload_tft(self, data: dict):
         _LOGGER.debug(f"async_service_upload_tft: {data}")

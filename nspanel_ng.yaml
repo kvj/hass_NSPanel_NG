@@ -22,9 +22,10 @@ api:
     - service: update_backlight
       variables:
         value: int
+        off_value: int
       then:
         - lambda: |-
-            id(cmp).update_backlight(value);
+            id(cmp).update_backlight(value, off_value);
     - service: update_relay
       variables:
         index: int
@@ -36,9 +37,11 @@ api:
       variables:
         index: int
         content: string
+        icon: int
+        color: int
       then:
         - lambda: |-
-            id(cmp).update_text(index, content);
+            id(cmp).update_text(index, content, icon, color);
     - service: show_cancel_dialog
       variables:
         seconds: int
@@ -115,7 +118,6 @@ binary_sensor:
     pin:
       number: 27
       inverted: true
-
 
 display:
   - id: disp
