@@ -57,11 +57,19 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     async def async_update_panel(call):
         for entry_id in await service.async_extract_config_entry_ids(hass, call):
-            await hass.data[DOMAIN]["devices"][entry_id].async_service_update_panel(call.data)
+            if coordinator := hass.data[DOMAIN]["devices"].get(entry_id):
+                await coordinator.async_service_update_panel(call.data)
     hass.services.async_register(DOMAIN, "update_panel", async_update_panel)
 
     async def async_upload_tft(call):
         for entry_id in await service.async_extract_config_entry_ids(hass, call):
-            await hass.data[DOMAIN]["devices"][entry_id].async_service_upload_tft(call.data)
+            if coordinator := hass.data[DOMAIN]["devices"].get(entry_id):
+                await coordinator.async_service_upload_tft(call.data)
     hass.services.async_register(DOMAIN, "upload_tft", async_upload_tft)
+
+    async def async_play_sound(call):
+        for entry_id in await service.async_extract_config_entry_ids(hass, call):
+            if coordinator := hass.data[DOMAIN]["devices"].get(entry_id):
+                await coordinator.async_service_play_sound(call.data)
+    hass.services.async_register(DOMAIN, "play_sound", async_play_sound)
     return True

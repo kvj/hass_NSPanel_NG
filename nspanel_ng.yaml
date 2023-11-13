@@ -57,6 +57,20 @@ api:
       then:
         - lambda: |-
             id(cmp).upload_tft(path);
+    - service: play_sound
+      variables:
+        rtttl_content: string
+      then:
+        - lambda: |-
+            id(cmp).play_sound(rtttl_content);
+    - service: update_center_icon
+      variables:
+        icon: int
+        color: int
+        visibility: int
+      then:
+        - lambda: |-
+            id(cmp).update_center_icon(icon, color, visibility);
 
 time:
   - platform: homeassistant

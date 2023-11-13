@@ -25,3 +25,16 @@ upload_tft:
       selector:
         text:
           type: url
+play_sound:
+  name: Play rtttl sound on the device
+  target:
+    device:
+      integration: nspanel_ng
+  fields:
+    sound:
+      name: Rtttl sound pattern
+      description: The rtttl string 
+      required: true
+      example: "long:d=1,o=5,b=100:e6"
+      selector:
+        text:

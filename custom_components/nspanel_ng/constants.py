@@ -6,6 +6,7 @@ PLATFORMS = ["button", "light", "switch", "sensor", "number"]
 DEFAULT_ICON = "bookmark"
 OFF_COLOR = "44739e"
 ON_COLOR = "ffc107"
+DISABLED_COLOR = "6f6f6f"
 BRIGHT_COLOR = "ffffff"
 
 #^\s*([\w\-]+):\s(\w+),

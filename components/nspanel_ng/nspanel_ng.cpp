@@ -132,18 +132,18 @@ bool NSPanelNG::update_grid_visibility(const int index, const std::string type_,
     for (auto it: all_grid_cmps) {
         display->hide_component(this->gen_id(it, index).c_str());
     }
-    delay(50);
+    // delay(50);
     if (type_ == "button") {
         for (auto it: button_grid_cmps) {
             display->show_component(this->gen_id(it, index).c_str());
         }
-        delay(50);
+        // delay(50);
     }
     if (type_ == "entity") {
         for (auto it: entity_grid_cmps) {
             display->show_component(this->gen_id(it, index).c_str());
         }
-        delay(50);
+        // delay(50);
     }
     this->cell_types[index] = type_;
     return true;
@@ -262,6 +262,17 @@ void NSPanelNG::loop() {
             display->upload_tft();
         }
     }
+    if (center_icon_blink_start > 0) {
+        bool flip = (millis() - center_icon_blink_start) >= abs(center_icon_visibility);
+        if (flip) {
+            center_icon_visibility = -center_icon_visibility;
+            center_icon_blink_start = millis();
+            if (center_icon_visibility < 0)
+                display->hide_component("bottom_icon");
+            else
+                display->show_component("bottom_icon");
+        }
+    }
 }
 
 void NSPanelNG::play_click_sound() {
@@ -281,6 +292,28 @@ void NSPanelNG::update_text(const int index, const std::string content, const in
         display->show_component(this->gen_id("bottom_text", index).c_str());
     }
 }
+
+void NSPanelNG::update_center_icon(const int icon, const int color, const int visibility) {
+    ESP_LOGD("ng", "update_center_icon: icon: %d color: %d  visibility: %d", icon, color, visibility);
+    center_icon_visibility = visibility;
+    center_icon_blink_start = 0;
+    if (visibility == 0) {
+        display->hide_component("bottom_icon");
+    } else {
+        display->set_component_font_color("bottom_icon", color);
+        display->set_component_text_printf("bottom_icon", this->gen_icon_char(icon).c_str());
+        display->show_component("bottom_icon");
+        if (visibility > 0) {
+            center_icon_blink_start = millis();
+        }
+    }
+}
+
+void NSPanelNG::play_sound(const std::string rtttl_content) {
+    ESP_LOGD("ng", "play_sound: %s", rtttl_content.c_str());
+    rtttl_player->play(rtttl_content);
+}
+
 
 }
 }
