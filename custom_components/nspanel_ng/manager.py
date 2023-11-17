@@ -11,6 +11,7 @@ from homeassistant.loader import async_get_integration
 from homeassistant.helpers import event, entity_registry, template
 from homeassistant.exceptions import HomeAssistantError
 
+import copy
 import logging
 
 _LOGGER = logging.getLogger(__name__)
@@ -235,7 +236,7 @@ class Coordinator(DataUpdateCoordinator):
             l()
         self._panel_listeners = []
         if data is None:
-            data = self.options["template_object"]
+            data = copy.deepcopy(self.options["template_object"])
             self._loaded["template"] = self.options["template"]
         self._config = {
             "grid": [],
