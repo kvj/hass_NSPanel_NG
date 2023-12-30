@@ -71,6 +71,12 @@ api:
       then:
         - lambda: |-
             id(cmp).update_center_icon(icon, color, visibility);
+    - service: update_pixels
+      variables:
+        pixels: int[]
+      then:
+        - lambda: |-
+            id(cmp).update_pixels(pixels);
 
 time:
   - platform: homeassistant
@@ -137,8 +143,8 @@ display:
   - id: disp
     platform: nextion
     uart_id: tf_uart
-    tft_url: "http://" # To enable TFT upload at runtime
-
+    tft_url: "http://example.com" # To enable TFT upload at runtime
+    exit_reparse_on_start: true
 nspanel_ng:
   id: cmp
   button1: button_1

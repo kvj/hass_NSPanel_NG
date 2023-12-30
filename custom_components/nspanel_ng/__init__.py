@@ -72,4 +72,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             if coordinator := hass.data[DOMAIN]["devices"].get(entry_id):
                 await coordinator.async_service_play_sound(call.data)
     hass.services.async_register(DOMAIN, "play_sound", async_play_sound)
+
+    async def async_update_pixels(call):
+        for entry_id in await service.async_extract_config_entry_ids(hass, call):
+            if coordinator := hass.data[DOMAIN]["devices"].get(entry_id):
+                await coordinator.async_service_update_pixels(call.data)
+    hass.services.async_register(DOMAIN, "update_pixels", async_update_pixels)
     return True

@@ -38,3 +38,15 @@ play_sound:
       example: "long:d=1,o=5,b=100:e6"
       selector:
         text:
+update_pixels:
+  name: Render new pixels on the device 
+  target:
+    device:
+      integration: nspanel_ng
+  fields:
+    rows:
+      name: Array of space separated colors
+      description: Array of space separated colors. One line per row. use XXXXXX to make it transparent
+      required: true
+      selector:
+        object: {}

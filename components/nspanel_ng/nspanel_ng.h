@@ -8,7 +8,7 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/api/api_server.h"
 
-#define NS_PANEL_NG_VER "0.1.2"
+#define NS_PANEL_NG_VER "0.1.3"
 
 
 namespace esphome {
@@ -58,6 +58,7 @@ class NSPanelNG : public esphome::Component, public esphome::nextion::NextionCom
         long tft_update_start = -1;
         int center_icon_visibility = 0;
         uint32_t center_icon_blink_start = 0;
+        int last_pixels_size = 0;
 
     public:
 
@@ -88,6 +89,7 @@ class NSPanelNG : public esphome::Component, public esphome::nextion::NextionCom
         void update_text(const int index, const std::string content, const int icon, const int color);
         void update_center_icon(const int icon, const int color, const int visibility);
         void play_sound(const std::string rtttl_content);
+        void update_pixels(const std::vector<int> pixels);
 
     private:
         bool update_grid_visibility(const int index, const std::string type_, const bool force=false);

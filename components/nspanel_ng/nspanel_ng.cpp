@@ -96,10 +96,10 @@ void NSPanelNG::send_metadata() {
 void NSPanelNG::upload_tft(const std::string path) {
     ESP_LOGD("ng", "upload_tft: via %s", path.c_str());
     if (tft_update_start == -1) {
-        display->set_tft_url(path);
-        display->write_str("DRAKJHSUYDGBNCJHGJKSHBDN");
-        const uint8_t to_send[3] = {0xFF, 0xFF, 0xFF};
-        display->write_array(to_send, sizeof(to_send));
+        // display->set_tft_url(path);
+        // display->write_str("DRAKJHSUYDGBNCJHGJKSHBDN");
+        // const uint8_t to_send[3] = {0xFF, 0xFF, 0xFF};
+        // display->write_array(to_send, sizeof(to_send));
         tft_url = path;
         tft_update_start = millis();
         ESP_LOGI("ng", "upload_tft: Scheduled upload via %s", path.c_str());
@@ -255,12 +255,12 @@ void NSPanelNG::loop() {
         this->send_hass_event("Device_Event", map);
     }
     if (tft_update_start != -1) {
-        if (millis() - tft_update_start >= TFT_UPDATE_DELAY) {
+        // if (millis() - tft_update_start >= TFT_UPDATE_DELAY) {
             tft_update_start = -1;
             ESP_LOGI("ng", "Starting TFT Upload: %s", tft_url.c_str());
             display->set_tft_url(tft_url);
             display->upload_tft();
-        }
+        // }
     }
     if (center_icon_blink_start > 0) {
         bool flip = (millis() - center_icon_blink_start) >= abs(center_icon_visibility);
@@ -314,6 +314,37 @@ void NSPanelNG::play_sound(const std::string rtttl_content) {
     rtttl_player->play(rtttl_content);
 }
 
+#define PIXELS_START_X 340
+#define PIXELS_START_Y 120
+#define PIXELS_SIZE 100.0
+#define PIXELS_GAP 2
+
+void NSPanelNG::update_pixels(const std::vector<int> pixels) {
+    ESP_LOGD("ng", "update_pixels(): size = %d", pixels.size());
+    if (pixels.size() == 0) {
+        ESP_LOGW("ng", "No pixels provided, exiting");
+        return;
+    } 
+    float size = sqrt(pixels.size());
+    if (floor(size) != size) {
+        ESP_LOGW("ng", "Pixels aren't square, exiting");
+        return;
+    }
+    auto bgColor = esphome::display::ColorUtil::to_color(4226, esphome::display::ColorOrder::COLOR_ORDER_RGB, esphome::display::ColorBitness::COLOR_BITNESS_565);
+    if (last_pixels_size != (int)size) {
+        ESP_LOGD("ng", "update_pixels(): clearing up area");
+        last_pixels_size = size;
+        display->fill_area(PIXELS_START_X, PIXELS_START_Y, PIXELS_SIZE, PIXELS_SIZE, bgColor);
+    }
+    int pixel_size = floor(PIXELS_SIZE / size);
+    int gap = PIXELS_GAP;
+    for (int i = 0; i < size; i++) {
+        for (int j = 0; j < size; j++) {
+            auto color = pixels[i * size + j] == -1? bgColor : esphome::display::ColorUtil::to_color(pixels[i * size + j], esphome::display::ColorOrder::COLOR_ORDER_RGB, esphome::display::ColorBitness::COLOR_BITNESS_565);
+            display->fill_area(PIXELS_START_X + j * (pixel_size), PIXELS_START_Y + i * (pixel_size), pixel_size - gap, pixel_size - gap, color);
+        }
+    }
+}
 
 }
 }

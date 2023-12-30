@@ -259,7 +259,7 @@ class Coordinator(DataUpdateCoordinator):
             else:
                 await self._async_send_grid_update(idx, type_="hidden")
             idx += 1
-        for i in range(idx, 8):
+        for i in range(idx, 7):
             await self._async_send_grid_update(i, type_="hidden")
         idx = 0
         for t in self._config.get("texts", []):
@@ -331,7 +331,7 @@ class Coordinator(DataUpdateCoordinator):
 
     def _discover_services(self):
         result = {}
-        for name in ("update_grid", "update_backlight", "update_relay", "update_text", "show_cancel_dialog", "send_metadata", "upload_tft", "play_sound", "update_center_icon"):
+        for name in ("update_grid", "update_backlight", "update_relay", "update_text", "show_cancel_dialog", "send_metadata", "upload_tft", "play_sound", "update_center_icon", "update_pixels"):
             svc = find_service(self.hass, self.options["name"], name)
             if not svc:
                 _LOGGER.warn(f"Failed to find service: {name}")
@@ -368,13 +368,13 @@ class Coordinator(DataUpdateCoordinator):
         }, blocking=False)
 
     async def _async_handle_grid_click(self, index: int, mode: str):
+        conf = self._get_config_section("grid", index)
         for l in self._event_listeners:
             await l("grid_click", {
                 "index": index,
                 "mode": mode,
                 **(conf.get("extra", {}) if conf else {})
             })
-        conf = self._get_config_section("grid", index)
         if conf:
             entity_id = template.render_complex(conf["target_"]) if "target" in conf else conf.get("entity_id")
             if entity_id and conf.get("tap", "single") == mode:
@@ -387,13 +387,13 @@ class Coordinator(DataUpdateCoordinator):
         })
 
     async def _async_handle_button_click(self, index: int, mode: str):
+        conf = self._get_config_section("buttons", index)
         for l in self._event_listeners:
             await l("button_click", {
                 "index": index,
                 "mode": mode,
                 **(conf.get("extra", {}) if conf else {})
             })
-        conf = self._get_config_section("buttons", index)
         if conf:
             if "relay" in conf:
                 _LOGGER.debug(f"_async_handle_button_click: toggle relay: {index}")
@@ -522,6 +522,20 @@ class Coordinator(DataUpdateCoordinator):
         if not svc:
             raise HomeAssistantError("Service not discovered")
         await self.hass.services.async_call("esphome", svc, { "rtttl_content": data["sound"] }, blocking=False)
+
+    async def async_service_update_pixels(self, data: dict):
+        _LOGGER.debug(f"async_service_update_pixels(): {data}")
+        svc = self.services.get("update_pixels")
+        if not svc:
+            raise HomeAssistantError("Service not discovered")
+        colors = []
+        for row in data.get("rows", []):
+            for c in row.lower().split(" "):
+                if c in ("xxxxxx", "#xxxxxx", "xxx", "#xxx"):
+                    colors.append(-1)
+                else:
+                    colors.append(self._color_hex_2_565(c))
+        await self.hass.services.async_call("esphome", svc, { "pixels": colors }, blocking=False)
 
     def add_event_listener(self, listener):
         self._event_listeners.append(listener)
