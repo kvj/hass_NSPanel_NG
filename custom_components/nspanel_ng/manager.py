@@ -28,6 +28,7 @@ class Coordinator(DataUpdateCoordinator):
         self._entry = entry
         self._panel_listeners = []
         self._device_listeners = []
+        self._event_listeners = []
         self._loaded = {"device": None, "template": None}
 
     async def _async_update(self):
@@ -367,6 +368,12 @@ class Coordinator(DataUpdateCoordinator):
         }, blocking=False)
 
     async def _async_handle_grid_click(self, index: int, mode: str):
+        for l in self._event_listeners:
+            await l("grid_click", {
+                "index": index,
+                "mode": mode,
+                **(conf.get("extra", {}) if conf else {})
+            })
         conf = self._get_config_section("grid", index)
         if conf:
             entity_id = template.render_complex(conf["target_"]) if "target" in conf else conf.get("entity_id")
@@ -380,6 +387,12 @@ class Coordinator(DataUpdateCoordinator):
         })
 
     async def _async_handle_button_click(self, index: int, mode: str):
+        for l in self._event_listeners:
+            await l("button_click", {
+                "index": index,
+                "mode": mode,
+                **(conf.get("extra", {}) if conf else {})
+            })
         conf = self._get_config_section("buttons", index)
         if conf:
             if "relay" in conf:
@@ -509,6 +522,15 @@ class Coordinator(DataUpdateCoordinator):
         if not svc:
             raise HomeAssistantError("Service not discovered")
         await self.hass.services.async_call("esphome", svc, { "rtttl_content": data["sound"] }, blocking=False)
+
+    def add_event_listener(self, listener):
+        self._event_listeners.append(listener)
+
+    def remove_event_listener(self, listener):
+        try:
+            self._event_listeners.remove(listener)
+        except:
+            pass
 
     
 class BaseEntity(CoordinatorEntity):
