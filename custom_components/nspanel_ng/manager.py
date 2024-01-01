@@ -16,6 +16,14 @@ import logging
 
 _LOGGER = logging.getLogger(__name__)
 
+class CoordinatorEvent:
+
+    async def async_on_event(self, event: str, data: dict):
+        pass
+
+    async def async_on_pixels(self, pixels: list):
+        pass
+
 class Coordinator(DataUpdateCoordinator):
 
     def __init__(self, hass, entry):
@@ -370,7 +378,7 @@ class Coordinator(DataUpdateCoordinator):
     async def _async_handle_grid_click(self, index: int, mode: str):
         conf = self._get_config_section("grid", index)
         for l in self._event_listeners:
-            await l("grid_click", {
+            await l.async_on_event("grid_click", {
                 "index": index,
                 "mode": mode,
                 **(conf.get("extra", {}) if conf else {})
@@ -389,7 +397,7 @@ class Coordinator(DataUpdateCoordinator):
     async def _async_handle_button_click(self, index: int, mode: str):
         conf = self._get_config_section("buttons", index)
         for l in self._event_listeners:
-            await l("button_click", {
+            await l.async_on_event("button_click", {
                 "index": index,
                 "mode": mode,
                 **(conf.get("extra", {}) if conf else {})
@@ -529,13 +537,18 @@ class Coordinator(DataUpdateCoordinator):
         if not svc:
             raise HomeAssistantError("Service not discovered")
         colors = []
+        color_names = []
         for row in data.get("rows", []):
             for c in row.lower().split(" "):
                 if c in ("xxxxxx", "#xxxxxx", "xxx", "#xxx"):
                     colors.append(-1)
+                    color_names.append(None)
                 else:
                     colors.append(self._color_hex_2_565(c))
+                    color_names.append(c if c[0] == "#" else f"#{c}")
         await self.hass.services.async_call("esphome", svc, { "pixels": colors }, blocking=False)
+        for l in self._event_listeners:
+            await l.async_on_pixels(color_names)
 
     def add_event_listener(self, listener):
         self._event_listeners.append(listener)

@@ -5,9 +5,8 @@
   "issue_tracker": "https://github.com/kvj/hass_NSPanel_NG/issues",
   "dependencies": ["esphome"],
   "codeowners": ["@kvj"],
-  "requirements": [],
+  "requirements": ["Pillow>=10.1.0"],
   "iot_class": "local_polling",
   "config_flow": true,
-  "version": "0.1.3"
+  "version": "0.1.4"
 }
-

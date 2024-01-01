@@ -1,7 +1,7 @@
 import re
 
 DOMAIN = "nspanel_ng"
-PLATFORMS = ["button", "light", "switch", "sensor", "number", "event"]
+PLATFORMS = ["button", "light", "switch", "sensor", "number", "event", "image"]
 
 DEFAULT_ICON = "bookmark"
 OFF_COLOR = "44739e"
