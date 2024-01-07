@@ -23,7 +23,7 @@ static std::vector<std::string> entity_grid_cmps = {"grid_bg", "grid_e_icon", "g
 #define CT_PENDING 2
 
 #define CT_LONG_PRESS 800
-#define CT_DOUBLE_DELAY 100
+#define CT_DOUBLE_DELAY 150
 
 #define CT_NONE 0
 #define CT_CLICK 1
@@ -33,9 +33,9 @@ static std::vector<std::string> entity_grid_cmps = {"grid_bg", "grid_e_icon", "g
 #define TFT_UPDATE_DELAY 15000
 
 struct ClickTracker {
-    uint32_t last_action;
-    uint8_t  last_detected_click;
-    uint8_t  state;
+    uint32_t action_ts;
+    uint8_t  clicks;
+    uint8_t  next_state;
 };
 
 class NSPanelNG : public esphome::Component, public esphome::nextion::NextionComponentBase {

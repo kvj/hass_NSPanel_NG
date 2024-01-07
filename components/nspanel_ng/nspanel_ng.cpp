@@ -6,9 +6,9 @@ namespace nspanel_ng {
 void NSPanelNG::setup() {
     for (int i = 0; i < 10; i++) {
         this->clicks.push_back(ClickTracker {
-            last_action: 0,
-            last_detected_click: CT_NONE,
-            state: CT_RELEASE
+            action_ts: 0,
+            clicks: 0,
+            next_state: CT_PENDING,
         });
     }
     // display->add_setup_state_callback([this]() {
@@ -188,43 +188,49 @@ void NSPanelNG::send_hass_event(const std::string name, std::map<std::string, st
 }
 
 void NSPanelNG::track_click(int index, bool press) {
-    uint32_t duration = millis() - clicks[index].last_action;
     if (press) {
-        if (clicks[index].state == CT_PENDING) {
-            // Pending - click has happened quick enough
-            clicks[index].last_detected_click = CT_CLICK; // One click has been detected
-            ESP_LOGD("ng", "track_click:[%d] Next click after delay: %d", index, duration);
-        } else {
-            clicks[index].last_detected_click = CT_NONE; // First press after a while
-        }
-        clicks[index].state = CT_PRESS; // Expect RELEASE
-        clicks[index].last_action = millis();
+
+        // Press - save when pressed and state
+        clicks[index].next_state = CT_RELEASE; // Expect release
+        clicks[index].action_ts = millis();
+        // ESP_LOGD("ns", "track_click(): Record press for: %d", index);
+
     } else {
-        if (duration >= CT_LONG_PRESS) {
-            clicks[index].last_detected_click = CT_LONG_CLICK; // Double click detected
-            ESP_LOGD("ng", "track_click:[%d] Long click after delay: %d", index, duration);
-        } else {
-            if (clicks[index].last_detected_click == CT_CLICK) {
-                clicks[index].last_detected_click = CT_DOUBLE_CLICK; // One click before, one now
-            } else {
-                clicks[index].last_detected_click = CT_CLICK; // One short click
-            }
+
+        // Only we actually expect release
+        if (clicks[index].next_state == CT_RELEASE) {
+            clicks[index].next_state = CT_PRESS;
+            clicks[index].action_ts = millis();
+            clicks[index].clicks += 1;
+            // ESP_LOGD("ns", "track_click(): Record release for: %d", index);
         }
-        clicks[index].state = CT_PENDING; // Expect report of result after a short delay
-        clicks[index].last_action = millis();
+
     }
 }
 
 uint8_t NSPanelNG::compute_click(int index) {
-    if (clicks[index].state == CT_PENDING) {
-        uint32_t duration = millis() - clicks[index].last_action;
+    uint32_t duration = millis() - clicks[index].action_ts;
+    if (clicks[index].next_state == CT_PRESS) {
+        // ESP_LOGD("ns", "compute_click(): Expect press for: %d", duration);
         if (duration >= CT_DOUBLE_DELAY) {
-            // Report as single click
-            clicks[index].state = CT_RELEASE;
-            uint8_t result = clicks[index].last_detected_click;
-            ESP_LOGD("ng", "compute_click:[%d] Report click after delay: %d - %d", index, duration, result);
-            clicks[index].last_detected_click = CT_NONE;
-            return result;
+
+            // Delay between clicks is too long - report as single/double click
+            clicks[index].next_state = CT_PENDING;
+            auto clicks_ = clicks[index].clicks;
+            if (clicks_ > 0) {
+                clicks[index].clicks = 0;
+                return clicks_ == 1? CT_CLICK: CT_DOUBLE_CLICK;
+            }
+        }
+    }
+    if (clicks[index].next_state == CT_RELEASE) {
+        // ESP_LOGD("ns", "compute_click(): Expect release for: %d", duration);
+        if (duration >= CT_LONG_PRESS) {
+
+            // Pressed for too long - report as long click
+            clicks[index].next_state = CT_PENDING;
+            clicks[index].clicks = 0;
+            return CT_LONG_CLICK;
         }
     }
     return CT_NONE;
@@ -241,6 +247,7 @@ void NSPanelNG::loop() {
             case CT_LONG_CLICK:
                 mode = "long"; break;
         }
+        ESP_LOGD("ns", "loop(): Report click: [%d] %s", i, mode.c_str());
         std::map<std::string, std::string> map;
         map["mode"] = mode;
         if (i < 8) {

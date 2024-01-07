@@ -383,9 +383,8 @@ class Coordinator(DataUpdateCoordinator):
                 "mode": mode,
                 **(conf.get("extra", {}) if conf else {})
             })
-        if conf:
-            entity_id = template.render_complex(conf["target_"]) if "target" in conf else conf.get("entity_id")
-            if entity_id and conf.get("tap", "single") == mode:
+        if conf and conf.get("tap", "single") == mode:
+            if entity_id := template.render_complex(conf["target_"]) if "target" in conf else conf.get("entity_id"):
                 await self._async_execute_action(entity_id, conf.get("service"), conf.get("extra", {}))
                 return
         await self._async_fire_event("grid_click", {
@@ -402,7 +401,7 @@ class Coordinator(DataUpdateCoordinator):
                 "mode": mode,
                 **(conf.get("extra", {}) if conf else {})
             })
-        if conf:
+        if conf and conf.get("tap", "single") == mode:
             if "relay" in conf:
                 _LOGGER.debug(f"_async_handle_button_click: toggle relay: {index}")
                 await self.set_relay(index, None)
