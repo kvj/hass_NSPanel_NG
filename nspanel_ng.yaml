@@ -1,5 +1,9 @@
 external_components:
   - source: ${component_link}
+  - source: github://kvj/esphome@nextion_touch_events
+    refresh: 30s
+    components:
+    - nextion
 
 esp32:
   board: esp32dev
@@ -7,18 +11,37 @@ esp32:
 ota:
 api:
   services:
-    - service: update_grid
+    - service: update_layout
       variables:
-        index: int
-        type: string
-        icon: int
-        name: string
-        value: string
-        unit: string
-        color: int
+        tags: int[]
       then:
         - lambda: |-
-            id(cmp).update_grid_cell(index, type, icon, name, value, unit, color);
+            id(cmp).update_layout(tags);
+    - service: update_cells
+      variables:
+        tag: int[]
+        type: string[]
+        icon: int[]
+        label: string[]
+        value: string[]
+        unit: string[]
+        color: int[]
+        bg_color: int[]
+      then:
+        - lambda: |-
+            for (uint8_t i = 0; i < tag.size(); i++) {
+              auto content = esphome::nspanel_ng::CellContent {
+                type: type[i],
+                icon: icon[i],
+                label: label[i],
+                value: value[i],
+                unit: unit[i],
+                color: color[i],
+                bg_color: bg_color[i],
+              };
+              id(cmp).update_cell(tag[i], content);
+            }
+
     - service: update_backlight
       variables:
         value: int
@@ -33,20 +56,6 @@ api:
       then:
         - lambda: |-
             id(cmp).update_relay(index, state);
-    - service: update_text
-      variables:
-        index: int
-        content: string
-        icon: int
-        color: int
-      then:
-        - lambda: |-
-            id(cmp).update_text(index, content, icon, color);
-    - service: show_cancel_dialog
-      variables:
-        seconds: int
-      then:
-        - logger.log: "Service: show_cancel_dialog"
     - service: send_metadata
       then:
         - lambda: |-
@@ -63,20 +72,20 @@ api:
       then:
         - lambda: |-
             id(cmp).play_sound(rtttl_content);
-    - service: update_center_icon
-      variables:
-        icon: int
-        color: int
-        visibility: int
-      then:
-        - lambda: |-
-            id(cmp).update_center_icon(icon, color, visibility);
     - service: update_pixels
       variables:
+        tag: int
         pixels: int[]
       then:
         - lambda: |-
-            id(cmp).update_pixels(pixels);
+            id(cmp).update_pixels(tag, pixels);
+    - service: update_screensaver
+      variables:
+        is_on: int
+        type: int
+      then:
+        - lambda: |-
+            id(cmp).update_screensaver(is_on != 0, type);
 
 time:
   - platform: homeassistant

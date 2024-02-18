@@ -1,4 +1,4 @@
-from .constants import DOMAIN, DEFAULT_ICON, MDI_ICONS_MAP, OFF_COLOR, ON_COLOR, BRIGHT_COLOR, DISABLED_COLOR, normalize_icon, icon_from_state
+from .constants import DOMAIN, DEFAULT_ICON, MDI_ICONS_MAP, OFF_COLOR, ON_COLOR, BRIGHT_COLOR, DISABLED_COLOR, DEFAULT_BG_COLOR, BACKGROUND_COLOR, normalize_icon, icon_from_state
 from .config_flow import find_service
 
 from homeassistant.helpers.update_coordinator import (
@@ -46,6 +46,7 @@ class Coordinator(DataUpdateCoordinator):
             "available": False,
             "brightness": data.get("brightness", 255),
             "off_brightness": data.get("off_brightness", 1),
+            "screensaver": False,
             "relays": data.get("relays", [False, False]),
             "component_version": None,
             "device_version": None,
@@ -85,17 +86,22 @@ class Coordinator(DataUpdateCoordinator):
         _LOGGER.debug(f"_icon_2_glyph: icon = {icon}, {state}")
         return 0xAC00 + (MDI_ICONS_MAP.get(icon, 0xF00C0) - 0xF0001)
 
-    async def _async_send_grid_update(self, index: int, *, type_: str="hidden", icon: int=0, name: str="", value: str="", unit: str="", color: int=0):
+    async def _async_send_grid_update(self, index: int, *, type_: str="hidden", icon: int=0, name: str="", value: str="", unit: str="", color: int=-1, bg_color=-1):
+        if type_ not in ("button", "icon", "text"):
+            _LOGGER.debug(f"_async_send_grid_update(): Skip sending unsupported cell: {type_}")
+            return False
         data = {
-            "index": index,
-            "type": type_,
-            "icon": icon,
-            "name": name,
-            "value": value,
-            "unit": unit,
-            "color": color,
+            "tag": [index],
+            "type": [type_],
+            "icon": [icon],
+            "label": [name],
+            "value": [value],
+            "unit": [unit],
+            "color": [color],
+            "bg_color": [bg_color],
         }
-        if svc := self.services.get("update_grid"):
+        _LOGGER.debug(f"_async_send_grid_update(): {data}")
+        if svc := self.services.get("update_cells"):
             await self.hass.services.async_call("esphome", svc, data, blocking=False)
 
     async def _async_send_static_text_update(self, index: int, conf: dict | None, state: dict | None=None):
@@ -111,14 +117,14 @@ class Coordinator(DataUpdateCoordinator):
         return await self._async_send_text_update(index, text, icon, color)
 
     async def _async_send_text_update(self, index: int, text: str, icon: int=0, color: int=65535):
-        data = {
-            "index": index,
-            "content": text,
-            "icon": icon,
-            "color": color,
-        }
-        if svc := self.services.get("update_text"):
-            await self.hass.services.async_call("esphome", svc, data, blocking=False)
+        await self._async_send_grid_update(
+            8 + index, 
+            type_="text", 
+            icon=icon, 
+            name=text, 
+            color=color, 
+            bg_color=self._color_hex_2_565(BACKGROUND_COLOR),
+        )
 
     async def _async_send_indicator_update(self, icon: int=0, color: int=65535, visibility: int=0):
         data = {
@@ -138,6 +144,14 @@ class Coordinator(DataUpdateCoordinator):
                 "off_value": off_value,
             }, blocking=False)
 
+    async def _async_send_screensaver(self):
+        value = self.data["screensaver"]
+        if svc := self.services.get("update_screensaver"):
+            await self.hass.services.async_call("esphome", svc, {
+                "is_on": 1 if value else 0,
+                "type": 0,
+            }, blocking=False)
+
     async def _async_send_relay_state(self, index, state):
         if svc := self.services.get("update_relay"):
             await self.hass.services.async_call("esphome", svc, {"index": index, "state": state}, blocking=False)
@@ -152,37 +166,45 @@ class Coordinator(DataUpdateCoordinator):
             type_="button",
             icon=self._icon_2_glyph(template.render_complex(conf["icon_"])),
             name=template.render_complex(conf["name_"]),
-            color=self._color_hex_2_565(template.render_complex(conf["color_"]), OFF_COLOR),
+            color=self._color_hex_2_565(template.render_complex(conf["color_"]), BRIGHT_COLOR),
+            bg_color=self._color_hex_2_565(DEFAULT_BG_COLOR)
         )
 
-    def _state_2_color(self, state: str | None) -> str:
+    def _state_2_color(self, state: str | None) -> (str, str):
         if state == "undefined":
-            return DISABLED_COLOR
-        return ON_COLOR if state == "on" else OFF_COLOR
+            return (DISABLED_COLOR, BRIGHT_COLOR)
+        return (ON_COLOR, BACKGROUND_COLOR) if state == "on" else (DEFAULT_BG_COLOR, BRIGHT_COLOR)
 
-    async def _async_update_indicator(self):
-        for i in self._config.get("indicator", []):
+    async def _async_update_indicator(self, index: int):
+        for gg in self._config["grid"][index].get("entities", []):
             state = None
             is_on = False
-            if entity_id := i.get("entity_id"):
+            if entity_id := gg.get("entity_id"):
                 state = self.hass.states.get(entity_id)
                 is_on = state and state.state == "on"
                 if not is_on:
                     continue
-            visibility = template.render_complex(i["blink_"], {"this": state}) if "blink" in i else -1
-            if visibility:
-                visibility = int(visibility)
-            icon = self._icon_2_glyph(template.render_complex(i["icon_"], {"this": state}), state)
-            def_color = ON_COLOR if is_on else OFF_COLOR
-            color = self._color_hex_2_565(template.render_complex(i["color_"], {"this": state}), def_color)
-            await self._async_send_indicator_update(icon, color, visibility)
-            return
-        await self._async_send_indicator_update()
-
+            # visibility = template.render_complex(i["blink_"], {"this": state}) if "blink" in i else -1
+            # if visibility:
+            #     visibility = int(visibility)
+            def_colors = self._state_2_color(state.state)
+            icon = self._icon_2_glyph(template.render_complex(gg["icon_"], {"this": state}), state)
+            name = template.render_complex(gg["name_"], {"this": state}) if "name" in gg else state.attributes.get("friendly_name", "")
+            color = self._color_hex_2_565(template.render_complex(gg["color_"], {"this": state}), def_colors[0])
+            await self._async_send_grid_update(
+                index,
+                type_="icon",
+                icon=icon,
+                name=name,
+                color=color,
+                bg_color=self._color_hex_2_565(BACKGROUND_COLOR),
+            )
+        await self._async_send_grid_update(index, type_="hidden")
 
     async def _async_update_entity(self, entity_id: str, state):
         _LOGGER.debug(f"_async_update_entity: {entity_id}, {state}")
         idx = 0
+        def_colors = self._state_2_color(state.state)
         for g in self._config.get("grid", []):
             if g.get("entity_id") == entity_id:
                 # Trigger grid cell update
@@ -191,17 +213,17 @@ class Coordinator(DataUpdateCoordinator):
                     _LOGGER.warn(f"Invalid state: {entity_id}")
                     await self._async_send_grid_update(idx, type_="hidden")
                 elif type_ == "button":
-                    def_color = self._state_2_color(state.state)
                     icon = self._icon_2_glyph(template.render_complex(g["icon_"], {"this": state}), state)
                     name = template.render_complex(g["name_"], {"this": state}) if "name" in g else state.attributes.get("friendly_name", "")
-                    color = self._color_hex_2_565(template.render_complex(g["color_"], {"this": state}), def_color)
+                    color = self._color_hex_2_565(template.render_complex(g["color_"], {"this": state}), def_colors[0])
 
                     await self._async_send_grid_update(
                         idx,
                         type_="button",
                         icon=icon,
                         name=name,
-                        color=color,
+                        bg_color=color,
+                        color=self._color_hex_2_565(def_colors[1]),
                     )
                 elif type_ == "entity":
                     icon = self._icon_2_glyph(template.render_complex(g["icon_"], {"this": state}), state)
@@ -218,24 +240,39 @@ class Coordinator(DataUpdateCoordinator):
                         value=value,
                         unit=unit,
                     )
+                elif type_ == "text":
+                    icon = self._icon_2_glyph(template.render_complex(g["icon_"], {"this": state}), state)
+                    name = template.render_complex(g["name_"], {"this": state}) if "name" in g else state.attributes.get("friendly_name", "")
+                    color = self._color_hex_2_565(template.render_complex(g["color_"], {"this": state}), ON_COLOR)
+                    await self._async_send_grid_update(
+                        idx,
+                        type_="text",
+                        icon=icon,
+                        name=name,
+                        color=color,
+                        bg_color=self._color_hex_2_565(BACKGROUND_COLOR),
+                    )
                 else:
                     _LOGGER.warn(f"Invalid grid config: {g}")
                     await self._async_send_grid_update(idx, type_="hidden")
+            elif entity_id in [x.get("entity_id") for x in g.get("entities", [])]:
+                await self._async_update_indicator(idx)
+
             idx += 1
         idx = 0
         for t in self._config.get("texts", []):
             if t.get("entity_id") == entity_id:
                 await self._async_send_static_text_update(idx, t, state)
             idx += 1
-        for i in self._config.get("indicator", []):
-            if i.get("entity_id") == entity_id:
-                await self._async_update_indicator()
-                break
 
     async def _async_on_state_change(self, entity_id: str, from_state, to_state):
         _LOGGER.debug(f"_async_on_state_change: {entity_id}")
         await self._async_update_entity(entity_id, to_state)
 
+    async def _async_send_layout(self):
+        default_layout = [0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 9, 9]
+        if svc := self.services.get("update_layout"):
+            await self.hass.services.async_call("esphome", svc, {"tags": default_layout}, blocking=False)
 
     async def async_refresh_panel(self, data=None):
         def _as_template(obj, names):
@@ -255,10 +292,16 @@ class Coordinator(DataUpdateCoordinator):
             **data,
         }
 
+        await self._async_send_layout()
+
         _entity_ids = []
         idx = 0
         for g in self._config.get("grid", []):
             _as_template(g, ("icon", "name", "color", "target", "value", "unit"))
+            for gg in g.get("entities", []):
+                if entity_id := gg.get("entity_id"):
+                    _as_template(gg, ("icon", "name", "color"))
+                    _entity_ids.append(entity_id)
             if entity_id := g.get("entity_id"):
                 _entity_ids.append(entity_id)
             elif g.get("type") == "button":
@@ -279,18 +322,10 @@ class Coordinator(DataUpdateCoordinator):
             idx += 1
         for i in range(idx, 2):
             await self._async_send_static_text_update(i, None)
-        has_indicator_entity = False
-        for i in self._config.get("indicator", []):
-            _as_template(i, ("icon", "color", "blink"))
-            if entity_id := i.get("entity_id"):
-                has_indicator_entity = True
-                _entity_ids.append(entity_id)
         if len(_entity_ids):
             self._panel_listeners.append(event.async_track_state_change(self.hass, _entity_ids, action=self._async_on_state_change))
             for _id in _entity_ids:
                 await self._async_update_entity(_id, self.hass.states.get(_id))
-        if not has_indicator_entity:
-            await self._async_update_indicator()
     
     def _find_device_entity(self, device_id):
         reg = entity_registry.async_get(self.hass)
@@ -334,12 +369,13 @@ class Coordinator(DataUpdateCoordinator):
             await self._async_send_relay_state(1, self.data["relays"][1])
             await self._async_request_metadata()
             await self.async_refresh_panel()
+            await self._async_send_screensaver()
         if changed:
             await self._async_fire_event("connected", { "connected": available })
 
     def _discover_services(self):
         result = {}
-        for name in ("update_grid", "update_backlight", "update_relay", "update_text", "show_cancel_dialog", "send_metadata", "upload_tft", "play_sound", "update_center_icon", "update_pixels"):
+        for name in ("update_layout", "update_cells", "update_backlight", "update_relay", "send_metadata", "upload_tft", "play_sound", "update_pixels", "update_screensaver"):
             svc = find_service(self.hass, self.options["name"], name)
             if not svc:
                 _LOGGER.warn(f"Failed to find service: {name}")
@@ -430,6 +466,10 @@ class Coordinator(DataUpdateCoordinator):
                 "display_version": event.data.get("display_version"),
                 "variant": event.data.get("display_type"),
             })
+        elif type_ == "screensaver":
+            await self._async_update_state({
+                "screensaver": event.data.get("is_on") == "true",
+            })
 
     @callback
     def _event_filter(self, event) -> bool:
@@ -469,6 +509,10 @@ class Coordinator(DataUpdateCoordinator):
         return self.data["brightness"]
 
     @property
+    def screensaver(self) -> bool:
+        return self.data["screensaver"]
+
+    @property
     def off_brightness(self):
         return self.data["off_brightness"]
 
@@ -501,6 +545,10 @@ class Coordinator(DataUpdateCoordinator):
         await self._async_update_state({"off_brightness": value})
         await self._async_update_storage({"off_brightness": value})
         await self._async_send_brightness()
+
+    async def async_set_screensaver(self, is_on: bool):
+        await self._async_update_state({"screensaver": is_on})
+        await self._async_send_screensaver()
 
     async def async_upload_tft(self, path: str = None):
         svc = self.services.get("upload_tft")
@@ -545,7 +593,7 @@ class Coordinator(DataUpdateCoordinator):
                 else:
                     colors.append(self._color_hex_2_565(c))
                     color_names.append(c if c[0] == "#" else f"#{c}")
-        await self.hass.services.async_call("esphome", svc, { "pixels": colors }, blocking=False)
+        await self.hass.services.async_call("esphome", svc, { "tag": 7, "pixels": colors }, blocking=False)
         for l in self._event_listeners:
             await l.async_on_pixels(color_names)
 

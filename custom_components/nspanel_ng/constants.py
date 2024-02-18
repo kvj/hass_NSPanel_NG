@@ -1,13 +1,15 @@
 import re
 
 DOMAIN = "nspanel_ng"
-PLATFORMS = ["button", "light", "switch", "sensor", "number", "event", "image"]
+PLATFORMS = ["button", "light", "switch", "sensor", "number", "event", "image", "camera"]
 
 DEFAULT_ICON = "bookmark"
 OFF_COLOR = "44739e"
 ON_COLOR = "ffc107"
 DISABLED_COLOR = "6f6f6f"
 BRIGHT_COLOR = "ffffff"
+DEFAULT_BG_COLOR = "1c1c1c"
+BACKGROUND_COLOR = "111111"
 
 #^\s*([\w\-]+):\s(\w+),
 #    "$1": "$2",

@@ -27,7 +27,8 @@ class _ClickEvent(BaseEntity, event.EventEntity, CoordinatorEvent):
 
     async def async_on_event(self, event, data):
         _LOGGER.debug(f"_async_on_event: {event} {data}")
-        self._trigger_event(event, {
-            **data
-        })
-        self.async_write_ha_state()
+        if event in self._attr_event_types:
+            self._trigger_event(event, {
+                **data
+            })
+            self.async_write_ha_state()
