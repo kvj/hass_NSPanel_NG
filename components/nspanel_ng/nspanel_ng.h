@@ -8,15 +8,13 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/api/api_server.h"
 
-#define NS_PANEL_NG_VER "0.1.3"
+#include <optional>
 
+#define NS_PANEL_NG_VER "0.2.0"
+// http://192.168.0.22/static/nspanel_ng_eu_0.2.tft
 
 namespace esphome {
 namespace nspanel_ng {
-
-static std::vector<std::string> all_grid_cmps = {"grid_bg", "grid_hs", "grid_b_icon", "grid_b_name", "grid_e_icon", "grid_e_name", "grid_e_value", "grid_e_unit"};
-static std::vector<std::string> button_grid_cmps = {"grid_bg", "grid_b_icon", "grid_b_name", "grid_hs"};
-static std::vector<std::string> entity_grid_cmps = {"grid_bg", "grid_e_icon", "grid_e_name", "grid_e_value", "grid_e_unit", "grid_hs"};
 
 #define CT_PRESS 0
 #define CT_RELEASE 1
@@ -32,10 +30,29 @@ static std::vector<std::string> entity_grid_cmps = {"grid_bg", "grid_e_icon", "g
 
 #define TFT_UPDATE_DELAY 15000
 
+#define SCREENSAVER_CHANGE_MS 30000
+
 struct ClickTracker {
     uint32_t action_ts;
     uint8_t  clicks;
     uint8_t  next_state;
+};
+
+struct CellContent {
+    std::string type;
+    uint16_t icon;
+    std::string label;
+    std::string value;
+    std::string unit;
+    int32_t color;
+    int32_t bg_color;
+};
+
+struct TagGeometry {
+    uint16_t x;
+    uint16_t y;
+    uint16_t w;
+    uint16_t h;
 };
 
 class NSPanelNG : public esphome::Component, public esphome::nextion::NextionComponentBase {
@@ -48,23 +65,33 @@ class NSPanelNG : public esphome::Component, public esphome::nextion::NextionCom
         esphome::api::APIServer *api_server;
         float brightness_ = 1.0;
         float off_brightness_ = 0.01;
-        std::map<int, std::string> cell_types = {{0, ""}, {1, ""}, {2, ""}, {3, ""}, {4, ""}, {5, ""}, {6, ""}, {7, ""}};
         std::vector<ClickTracker> clicks;
+
+        std::map<uint8_t, std::vector<uint8_t>> tag_to_cells = {};
+        std::map<uint8_t, uint8_t> cell_to_tag = {};
+        std::map<uint8_t, CellContent> tag_content = {};
+
+        std::vector<int> pixels_ = {};
+        uint8_t pixels_tag_ = 0;
+
+        bool pixels_screensaver_ = false;
+        uint16_t pixels_screensaver_dim_[3] = {0, 0, 0};
+        uint32_t pixels_screensaver_change_ts_ = 0;
+
+        int last_pixels_size = 0;
+
         std::string display_version_ = "Disconnected";
         std::string display_variant_;
         bool visual_feeback = true;
-        bool sound_feedback = false;
         std::string tft_url;
         long tft_update_start = -1;
         int center_icon_visibility = 0;
         uint32_t center_icon_blink_start = 0;
-        int last_pixels_size = 0;
 
     public:
 
         void set_display(esphome::nextion::Nextion *display) { 
             this->display = display; 
-            display->register_textsensor_component(this);
         }
         void set_api_server(esphome::api::APIServer *api_server) { this->api_server = api_server; }
         void set_relays(esphome::switch_::Switch *relay1, esphome::switch_::Switch *relay2) {
@@ -80,7 +107,9 @@ class NSPanelNG : public esphome::Component, public esphome::nextion::NextionCom
 
         void setup() override;
         void loop() override;
+
         void process_text(const std::string &name, const std::string &value) override;
+
         void update_relay(const int index, const bool state);
         void update_backlight(const int value, const int off_value);
         void send_metadata();
@@ -89,17 +118,29 @@ class NSPanelNG : public esphome::Component, public esphome::nextion::NextionCom
         void update_text(const int index, const std::string content, const int icon, const int color);
         void update_center_icon(const int icon, const int color, const int visibility);
         void play_sound(const std::string rtttl_content);
-        void update_pixels(const std::vector<int> pixels);
+
+        void update_pixels(uint8_t tag, std::vector<int> pixels);
+        void update_layout(std::vector<int> layout);
+        void update_cell(uint8_t tag, CellContent content);
+
+        void update_screensaver(const bool is_on, const int type);
 
     private:
-        bool update_grid_visibility(const int index, const std::string type_, const bool force=false);
-        const std::string gen_id(std::string prefix, int index);
         const std::string gen_icon_char(int icon);
         void send_hass_event(const std::string name, std::map<std::string, std::string> extra);
         void track_click(int index, bool press);
         uint8_t compute_click(int index);
         float _brightness_adjusted() { return brightness_ == 0? off_brightness_: brightness_; }
-        void play_click_sound();
+
+        TagGeometry calc_geometry(uint8_t tag);
+        void render_cell(uint8_t tag, bool with_bg, esphome::Color bg_color);
+
+        void process_touch(uint16_t x, uint16_t y, bool on);
+
+        void nextion_xstr(uint16_t x, uint16_t y, uint16_t w, u_int16_t h, uint8_t font, esphome::Color color, esphome::Color bg_color, uint8_t ha, std::string text);
+
+        void draw_pixels(uint16_t x, uint16_t y, uint16_t w, bool clear);
+
 };
 
 }
