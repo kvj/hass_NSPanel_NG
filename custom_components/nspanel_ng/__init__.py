@@ -10,6 +10,8 @@ from homeassistant.helpers import service
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
+from homeassistant.components import webhook
+from aiohttp.web import json_response
 
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
@@ -26,13 +28,34 @@ async def _async_update_entry(hass, entry):
     coordinator = hass.data[DOMAIN]["devices"][entry.entry_id]
     await coordinator.async_refresh_maybe(entry)
 
+async def _async_handle_webhook(hass, webhook_id, request):
+    try:
+        message = await request.json()
+    except ValueError:
+        _LOGGER.warning(f"_async_handle_webhook: Invalid JSON in Webhook")
+        return json_response({})
+    _LOGGER.debug(f"_async_handle_webhook: JSON: {message}")
+    if coordinator := hass.data[DOMAIN]["devices"].get(hass.data[DOMAIN]["webhooks"].get(webhook_id)):
+        response = await coordinator.async_handle_webhook(message)
+        _LOGGER.debug(f"_async_handle_webhook: Response: {response}")
+        return json_response(response)
+    else:
+        _LOGGER.warning(f"_async_handle_webhook: No scanner registered for webhook {webhook_id}")
+    return json_response({})
+
 async def async_setup_entry(hass: HomeAssistant, entry):
     data = entry.as_dict()["data"]
+    options = entry.as_dict()["options"]
 
     coordinator = Coordinator(hass, entry)
     hass.data[DOMAIN]["devices"][entry.entry_id] = coordinator
     entry.async_on_unload(entry.add_update_listener(_async_update_entry))
     await coordinator.async_config_entry_first_refresh()
+
+    if hook_id := options.get("webhook"):
+        hass.data[DOMAIN]["webhooks"][hook_id] = entry.entry_id
+        webhook.async_register(hass, DOMAIN, "NSPanel NG", hook_id, _async_handle_webhook)
+
     await coordinator.async_load()
 
     for p in PLATFORMS:
@@ -42,6 +65,11 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry):
+    options = entry.as_dict()["options"]
+
+    if hook_id := options.get("webhook"):
+        webhook.async_unregister(hass, hook_id)
+
     coordinator = hass.data[DOMAIN]["devices"][entry.entry_id]
     for p in PLATFORMS:
         await hass.config_entries.async_forward_entry_unload(entry, p)
@@ -51,7 +79,7 @@ async def async_unload_entry(hass: HomeAssistant, entry):
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    hass.data[DOMAIN] = {"devices": {}}
+    hass.data[DOMAIN] = {"devices": {}, "webhooks": {}}
 
     hass.http.register_static_path("/nspanel_ng/tft", f"{locate_dir()}/tft", cache_headers=False)
 

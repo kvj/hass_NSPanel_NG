@@ -6,6 +6,7 @@
         "data": {
           "device": "ESPHome device",
           "hass_url": "Local Home Assistant URL",
+          "webhook": "Webhook ID",
           "template": "YAML configuration"
         }
       }
@@ -22,6 +23,7 @@
         "data": {
           "device": "ESPHome device",
           "hass_url": "Local Home Assistant URL",
+          "webhook": "Webhook ID",
           "template": "YAML configuration"
         }
       }

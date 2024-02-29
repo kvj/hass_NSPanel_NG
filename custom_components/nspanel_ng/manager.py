@@ -38,6 +38,7 @@ class Coordinator(DataUpdateCoordinator):
         self._device_listeners = []
         self._event_listeners = []
         self._loaded = {"device": None, "template": None}
+        self.services = {}
 
     async def _async_update(self):
         data = self._entry.as_dict()["data"]
@@ -370,6 +371,7 @@ class Coordinator(DataUpdateCoordinator):
             await self._async_request_metadata()
             await self.async_refresh_panel()
             await self._async_send_screensaver()
+            await self._async_send_pixels()
         if changed:
             await self._async_fire_event("connected", { "connected": available })
 
@@ -451,9 +453,14 @@ class Coordinator(DataUpdateCoordinator):
             **(conf.get("extra", {}) if conf else {})
         })
 
+    async def _async_handle_key_click(self, code):
+        await self._async_fire_event("key_click", {
+            "code": code,
+        })
+
     async def _async_on_device_event(self, event):
-        _LOGGER.debug(f"_async_on_device_event: {event}")
         type_ = event.data.get("type")
+        _LOGGER.debug(f"_async_on_device_event: {event}, type = {type_}")
         if type_ == "wake":
             await self.set_brightness(self.brightness, True)
         elif type_ == "grid_click":
@@ -470,6 +477,10 @@ class Coordinator(DataUpdateCoordinator):
             await self._async_update_state({
                 "screensaver": event.data.get("is_on") == "true",
             })
+        elif type_ == "online":
+            await self._async_send_pixels()
+        elif type_ == "key_click":
+            await self._async_handle_key_click(event.data.get("code"))
 
     @callback
     def _event_filter(self, event) -> bool:
@@ -503,6 +514,21 @@ class Coordinator(DataUpdateCoordinator):
         await self._async_update_state({
             "available": False,
         })
+    # curl -vv -X POST -d '{"type":"request", "service": "update_pixels"}' "http://localhost:8123/api/webhook/2ef3e9d8f398c7d06e36bc9704ad557fcb6c8558d535cf54bd39a105165d79b4"
+    async def async_handle_webhook(self, request):
+        _LOGGER.debug(f"async_handle_webhook: {request}")
+        if request.get("type") == "request":
+            if request.get("service") == "update_pixels":
+                # Send stored pixels back
+                return {
+                    "service": "update_pixels",
+                    "data": { "tag": self.data.get("pixel_tag", 0), "pixels": self.data.get("pixels", []) },
+                }
+        elif request.get("type") == "event":
+            data = request.get("data", {})
+            if data.get("type") == "key_click":
+                await self._async_handle_key_click(chr(data.get("code")))
+        return {}
 
     @property
     def brightness(self):
@@ -575,14 +601,22 @@ class Coordinator(DataUpdateCoordinator):
     async def async_service_play_sound(self, data: dict):
         svc = self.services.get("play_sound")
         if not svc:
-            raise HomeAssistantError("Service not discovered")
+            raise HomeAssistantError("Service [play_sound] not discovered")
         await self.hass.services.async_call("esphome", svc, { "rtttl_content": data["sound"] }, blocking=False)
+
+    async def _async_send_pixels(self):
+        svc = self.services.get("update_pixels")
+        if not svc:
+            raise HomeAssistantError("Service [update_pixels] not discovered")
+        payload = {
+            "tag": self.data.get("pixel_tag", 0), 
+            "pixels": self.data.get("pixels", []), 
+        }
+        _LOGGER.debug(f"_async_send_pixels: {payload}")
+        await self.hass.services.async_call("esphome", svc, payload, blocking=False)
 
     async def async_service_update_pixels(self, data: dict):
         _LOGGER.debug(f"async_service_update_pixels(): {data}")
-        svc = self.services.get("update_pixels")
-        if not svc:
-            raise HomeAssistantError("Service not discovered")
         colors = []
         color_names = []
         for row in data.get("rows", []):
@@ -593,9 +627,10 @@ class Coordinator(DataUpdateCoordinator):
                 else:
                     colors.append(self._color_hex_2_565(c))
                     color_names.append(c if c[0] == "#" else f"#{c}")
-        await self.hass.services.async_call("esphome", svc, { "tag": 7, "pixels": colors }, blocking=False)
+        await self._async_update_state({"pixels": colors, "pixel_colors": color_names, "pixel_tag": 7})
         for l in self._event_listeners:
             await l.async_on_pixels(color_names)
+        await self._async_send_pixels()
 
     def add_event_listener(self, listener):
         self._event_listeners.append(listener)
