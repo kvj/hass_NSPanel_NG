@@ -3,6 +3,7 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.selector import selector
 from homeassistant.helpers import device_registry, network
 from homeassistant.util.yaml.loader import parse_yaml
+from homeassistant.components import webhook
 
 from .constants import DOMAIN
 
@@ -29,6 +30,7 @@ def _validate(hass, input: dict) -> (str | None, dict):
         return "invalid_device", result
     result["device"] = input["device"]
     result["hass_url"] = input["hass_url"]
+    result["webhook"] = input["webhook"]
     conns = {val[0]: val[1] for val in device.connections}
     _LOGGER.debug(f"Connections: {conns}")
     if "mac" not in conns:
@@ -55,6 +57,7 @@ def _get_local_hass_url(hass) -> str:
         return "http://your-local-hass-url"
 
 def _create_schema(hass, input: dict):
+    hook_id =input["webhook"] if "webhook" in input else webhook.async_generate_id()
     schema = vol.Schema({
         vol.Required("device", default=input.get("device")): selector({
             "device": {
@@ -64,6 +67,9 @@ def _create_schema(hass, input: dict):
             }
         }),
         vol.Required("hass_url", default=input.get("hass_url", _get_local_hass_url(hass))): selector({
+            "text": { "type": "url" }
+        }),
+        vol.Required("webhook", description={"suggested_value": hook_id}): selector({
             "text": { "type": "url" }
         }),
         vol.Required("template", default=input.get("template")): selector({
