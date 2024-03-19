@@ -53,8 +53,11 @@ async def async_setup_entry(hass: HomeAssistant, entry):
     await coordinator.async_config_entry_first_refresh()
 
     if hook_id := options.get("webhook"):
-        hass.data[DOMAIN]["webhooks"][hook_id] = entry.entry_id
-        webhook.async_register(hass, DOMAIN, "NSPanel NG", hook_id, _async_handle_webhook)
+        try:
+            webhook.async_register(hass, DOMAIN, "NSPanel NG", hook_id, _async_handle_webhook)
+            hass.data[DOMAIN]["webhooks"][hook_id] = entry.entry_id
+        except:
+            _LOGGER.exception(f"async_setup_entry: Failed to create webhook listener")
 
     await coordinator.async_load()
 
@@ -68,7 +71,11 @@ async def async_unload_entry(hass: HomeAssistant, entry):
     options = entry.as_dict()["options"]
 
     if hook_id := options.get("webhook"):
-        webhook.async_unregister(hass, hook_id)
+        try:
+            hass.data[DOMAIN]["webhooks"].pop(hook_id)
+            webhook.async_unregister(hass, hook_id)
+        except:
+            _LOGGER.exception(f"async_unload_entry: Failed to remove webhook listener")
 
     coordinator = hass.data[DOMAIN]["devices"][entry.entry_id]
     for p in PLATFORMS:
