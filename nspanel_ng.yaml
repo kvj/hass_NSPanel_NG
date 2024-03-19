@@ -8,6 +8,9 @@ external_components:
 esp32:
   board: esp32dev
 
+esp32_ble_server:
+esp32_ble_tracker:
+
 ota:
 api:
   services:
@@ -160,6 +163,7 @@ display:
     uart_id: tf_uart
     tft_url: "http://example.com" # To enable TFT upload at runtime
     exit_reparse_on_start: true
+
 nspanel_ng:
   id: cmp
   button1: button_1

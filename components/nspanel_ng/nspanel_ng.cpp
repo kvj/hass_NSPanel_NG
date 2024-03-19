@@ -3,6 +3,10 @@
 namespace esphome {
 namespace nspanel_ng {
 
+namespace espbt = esphome::esp32_ble_tracker;
+namespace espbs = esphome::esp32_ble_server;
+
+
 void NSPanelNG::setup() {
     for (int i = 0; i < 14; i++) {
         this->clicks.push_back(ClickTracker {
@@ -209,6 +213,7 @@ uint8_t NSPanelNG::compute_click(int index) {
 }
 
 void NSPanelNG::loop() {
+    EasyBLEServer::loop();
     for (int i = 0; i < 14; i++) {
         uint8_t click_result = compute_click(i);
         if (click_result == CT_NONE) continue;
@@ -341,6 +346,13 @@ void NSPanelNG::update_pixels(uint8_t tag, const std::vector<int> pixels) {
     }
     this->pixels_.insert(this->pixels_.end(), pixels.begin(), pixels.end());
     pixels_tag_ = tag;
+
+    std::vector<uint8_t> ble_data = {};
+    ble_data.push_back(tag);
+    for (auto &it : pixels) {
+        ble_data.push_back(it); ble_data.push_back(it >> 8);
+    }
+    ble_write_char(BLE_SERVICE, BLE_CHR_MAP, ble_data, true);
 
     bool clear = false;
     if (last_pixels_size != (int)size) {
@@ -590,6 +602,56 @@ void NSPanelNG::update_screensaver(const bool is_on, const int type) {
         update_pixels(pixels_tag_, pixels_);
     }
 }
+
+void EasyBLEServer::loop() {
+    if (this->ble_server->is_running()) {
+        if (!ble_setup_complete) {
+            this->ble_create_services();
+            ble_setup_complete = true;
+        }
+        this->ble_start_services();
+    }
+}
+
+void EasyBLEServer::ble_create_services() {
+    auto svc_id = espbt::ESPBTUUID::from_uint16(BLE_SERVICE);
+    auto chr_id = espbt::ESPBTUUID::from_uint16(BLE_CHR_MAP);
+    this->ble_server->create_service(svc_id, true);
+    auto *svc = this->ble_server->get_service(svc_id);
+    auto *chr = svc->create_characteristic(chr_id, espbs::BLECharacteristic::PROPERTY_READ | espbs::BLECharacteristic::PROPERTY_NOTIFY);
+    chr->add_descriptor(new esphome::esp32_ble_server::BLE2902());
+}
+
+void EasyBLEServer::ble_start_services() {
+    auto svc_id = espbt::ESPBTUUID::from_uint16(BLE_SERVICE);
+    auto *svc = this->ble_server->get_service(svc_id);
+    if (svc != nullptr) {
+        if (svc->is_created() && !svc->is_running()) {
+            ESP_LOGD("ng", "ble_start_services(): starting service: 0x%x", BLE_SERVICE);
+            svc->start();
+        }
+    }
+}
+
+bool EasyBLEServer::ble_write_char(uint16_t svc_uuid, uint16_t chr_uuid, std::vector<uint8_t> data, bool notify) {
+    auto *svc = this->ble_server->get_service(espbt::ESPBTUUID::from_uint16(svc_uuid));
+    if (svc == nullptr) return false;
+    auto *chr = svc->get_characteristic(chr_uuid);
+    if (chr == nullptr) return false;
+    std::string log_str = "";
+    for (int i = 0; i < data.size(); i++) {
+        char buf[3];
+        sprintf(buf, "%02x ", data[i]);
+        log_str.append(buf);
+    }
+    chr->set_value(data);
+    ESP_LOGD("ng", "ble_write_char() 0x%x::0x%x [%d] %s", svc_uuid, chr_uuid, notify, log_str.c_str());
+    if (notify && (this->ble_server->get_connected_client_count() == 0)) return false;
+    if (notify)
+        chr->notify(true);
+    return true;
+}
+
 
 }
 }

@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import nextion, switch, binary_sensor, api, rtttl
+from esphome.components import nextion, switch, binary_sensor, api, rtttl, esp32_ble_server
 
 from esphome.const import (
     CONF_ID,
@@ -8,8 +8,8 @@ from esphome.const import (
 )
 
 CODEOWNERS = ["@kvj"]
-DEPENDENCIES = []
-AUTO_LOAD = ["json"]
+DEPENDENCIES = ["esp32_ble_server"]
+AUTO_LOAD = ["json", "esp32_ble"]
 
 MULTI_CONF = False
 
@@ -21,9 +21,11 @@ CONF_BUTTON1 = "button1"
 CONF_BUTTON2 = "button2"
 CONF_VARIANT = "variant"
 CONF_RTTTL = "rtttl"
+CONF_BLE_SERVER = "ble_server_id"
 
 _ns = cg.esphome_ns.namespace("nspanel_ng")
-_cls = _ns.class_("NSPanelNG", cg.Component)
+_srv_cls = _ns.class_("EasyBLEServer")
+_cls = _ns.class_("NSPanelNG", cg.Component, _srv_cls)
 
 CONFIG_SCHEMA = (
     cv.Schema({
@@ -36,6 +38,7 @@ CONFIG_SCHEMA = (
         cv.GenerateID(CONF_BUTTON2): cv.use_id(binary_sensor.BinarySensor),
         cv.Required(CONF_VARIANT): cv.string,
         cv.GenerateID(CONF_RTTTL): cv.use_id(rtttl.Rtttl),
+        cv.GenerateID(CONF_BLE_SERVER): cv.use_id(esp32_ble_server.BLEServer),
     })
     .extend(cv.COMPONENT_SCHEMA)
 )
@@ -48,4 +51,5 @@ async def to_code(config):
     cg.add(var.set_relays(await cg.get_variable(config[CONF_RELAY1]), await cg.get_variable(config[CONF_RELAY2])))
     cg.add(var.set_buttons(await cg.get_variable(config[CONF_BUTTON1]), await cg.get_variable(config[CONF_BUTTON2])))
     cg.add(var.set_rtttl_player(await cg.get_variable(config[CONF_RTTTL])))
+    cg.add(var.set_ble_server(await cg.get_variable(config[CONF_BLE_SERVER])))
     await cg.register_component(var, config)

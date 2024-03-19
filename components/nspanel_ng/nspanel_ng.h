@@ -8,9 +8,13 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/api/api_server.h"
 
+#include "esphome/components/esp32_ble_server/ble_server.h"
+#include "esphome/components/esp32_ble_tracker/esp32_ble_tracker.h"
+#include "esphome/components/esp32_ble_server/ble_2902.h"
+
 #include <optional>
 
-#define NS_PANEL_NG_VER "0.2.0"
+#define NS_PANEL_NG_VER "0.2.2"
 // http://192.168.0.22/static/nspanel_ng_eu_0.2.tft
 
 namespace esphome {
@@ -31,6 +35,9 @@ namespace nspanel_ng {
 #define TFT_UPDATE_DELAY 15000
 
 #define SCREENSAVER_CHANGE_MS 30000
+
+#define BLE_SERVICE 0x2101
+#define BLE_CHR_MAP 0x3101
 
 struct ClickTracker {
     uint32_t action_ts;
@@ -55,7 +62,24 @@ struct TagGeometry {
     uint16_t h;
 };
 
-class NSPanelNG : public esphome::Component, public esphome::nextion::NextionComponentBase {
+class EasyBLEServer {
+    protected:
+        esphome::esp32_ble_server::BLEServer *ble_server = nullptr;
+        bool ble_setup_complete = false;
+
+        void ble_create_services();
+        void ble_start_services();
+
+    public:
+        void set_ble_server(esphome::esp32_ble_server::BLEServer *ble_server) { this->ble_server = ble_server; }        
+
+        void loop();
+        
+        bool ble_write_char(uint16_t svc_uuid, uint16_t chr_uuid, std::vector<uint8_t> data, bool notify);
+
+};
+
+class NSPanelNG : public esphome::Component, public esphome::nextion::NextionComponentBase, public EasyBLEServer {
 
     private:
         esphome::rtttl::Rtttl *rtttl_player;
