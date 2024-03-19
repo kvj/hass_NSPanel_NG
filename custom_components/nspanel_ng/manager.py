@@ -326,7 +326,8 @@ class Coordinator(DataUpdateCoordinator):
         if len(_entity_ids):
             self._panel_listeners.append(event.async_track_state_change(self.hass, _entity_ids, action=self._async_on_state_change))
             for _id in _entity_ids:
-                await self._async_update_entity(_id, self.hass.states.get(_id))
+                if state := self.hass.states.get(_id):
+                    await self._async_update_entity(_id, state)
     
     def _find_device_entity(self, device_id):
         reg = entity_registry.async_get(self.hass)
@@ -497,7 +498,8 @@ class Coordinator(DataUpdateCoordinator):
         self._loaded["device"] = self.options["device"]
         if device_entity:
             self._device_listeners.append(event.async_track_state_change(self.hass, [device_entity], action=self._async_on_device_state_change))
-            await self._async_on_device_state_change(device_entity, None, self.hass.states.get(device_entity))
+            if state := self.hass.states.get(device_entity):
+                await self._async_on_device_state_change(device_entity, None, state)
         else:
             _LOGGER.warn(f"Couldn't find any device entity")
         self._device_listeners.append(self.hass.bus.async_listen("esphome.NSPanel_NG_Device_Event", self._async_on_device_event, self._event_filter))
