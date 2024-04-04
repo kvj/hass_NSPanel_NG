@@ -484,8 +484,8 @@ class Coordinator(DataUpdateCoordinator):
             await self._async_handle_key_click(event.data.get("code"))
 
     @callback
-    def _event_filter(self, event) -> bool:
-        return event.data.get("device_id") == self.options["device"]
+    def _event_filter(self, event_data) -> bool:
+        return event_data.get("device_id") == self.options["device"]
 
     async def async_load(self):
         component = await async_get_integration(self.hass, DOMAIN)
